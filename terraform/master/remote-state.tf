@@ -48,7 +48,10 @@ resource "aws_s3_bucket_policy" "tf-state-policy" {
         "AWS": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/${var.provisioner_account_name}"
       },
       "Action": "s3:*",
-      "Resource": "arn:aws:s3:::${aws_s3_bucket.tf-state.id}/*"
+      "Resource": [
+        "arn:aws:s3:::${aws_s3_bucket.tf-state.id}/*",
+        "arn:aws:s3:::${aws_s3_bucket.tf-state.id}"
+        ]
     }
   ]
 }

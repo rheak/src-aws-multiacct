@@ -94,3 +94,14 @@ provider "aws" {
   profile = "${var.profile}"
   region  = "us-west-2"
 }
+# BEGIN Terraform Remote Backend Config Block
+terraform {
+  backend "s3" {
+    bucket         = "src-master-tf-state"
+    key            = "terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "src-master-tf-state"
+    }
+}
+# END Terraform Remote Backend Config Block

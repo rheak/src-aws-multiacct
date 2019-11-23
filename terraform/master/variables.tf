@@ -15,10 +15,6 @@ variable "main_region" {
   default = "us-east-1"
 }
 
-variable "aws_plugin_version" {
-  description = "The AWS Terraform Provider Plug-In Version"
-}
-
 variable "provisioner_account_name" {
   description = "The Name of the IAM user Created in the Master Account for Provisioning"
   default = "Provisioner"

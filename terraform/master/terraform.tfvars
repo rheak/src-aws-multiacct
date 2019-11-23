@@ -1,4 +1,12 @@
-Provide the name of the account that will serve as the GuardDuty Master (Security Account is recommended)
+# BEGIN Ansible imported Variables Block
+
+org_name = "src"
+
+profile = "default"
+
+main_region = "us-east-1"
+# END Ansible imported Variables Block
+#Provide the name of the account that will serve as the GuardDuty Master (Security Account is recommended)
 guardduty_master = "src-security"
 
 master_acct = {

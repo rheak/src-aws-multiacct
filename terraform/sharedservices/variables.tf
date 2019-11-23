@@ -15,10 +15,6 @@ variable "main_region" {
   default = "us-east-1"
 }
 
-variable "aws_plugin_version" {
-  description = "The AWS Terraform Provider Plug-In Version"
-}
-
 variable "sharedservices_acct_id" {
   description = "The AWS Account ID for the Security Account"
 }
