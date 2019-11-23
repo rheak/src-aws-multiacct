@@ -174,3 +174,30 @@ provider "aws" {
     session_name = "deploy-session"
   }
 }
+# BEGIN  Terraform Remote Backend Config Block
+terraform {
+  backend "s3" {
+    bucket         = "src-log-tf-state"
+    key            = "terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "src-log-tf-state"
+    profile        = "default"
+    role_arn       = "arn:aws:iam::051805593070:role/src-deploy-role"
+    }
+}
+# END  Terraform Remote Backend Config Block
+# BEGIN  Terraform Enterprise Accounts Remote State Data Config Block
+data "terraform_remote_state" "master" {
+  backend = "s3"
+
+  config = {
+    bucket         = "src-master-tf-state"
+    key            = "terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "src-master-tf-state"
+    profile        = "default"
+  }
+}
+# END  Terraform Enterprise Accounts Remote State Data Config Block
