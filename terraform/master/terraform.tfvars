@@ -7,7 +7,7 @@ profile = "default"
 main_region = "us-east-1"
 # END Ansible imported Variables Block
 #Provide the name of the account that will serve as the GuardDuty Master (Security Account is recommended)
-guardduty_master = "src-security"
+guardduty_master = "security"
 
 master_acct = {
     name      = "src-master"
@@ -16,22 +16,29 @@ master_acct = {
 }
 
 member_accts = {
-  smap-security = {
+  security = {
     name      = "src-security"
     email     = "src-security@sunrock-consulting.com"
     guardduty = "master"
-    iam-billing = "ALLOW"
   },
-  smap-log = {
+  log = {
     name      = "src-log"
     email     = "src-log@sunrock-consulting.com"
     guardduty = "member"
-    iam-billing = "ALLOW"
   },
-  smap-sharedservices = {
+  sharedservices = {
     name      = "src-sharedservices"
     email     = "src-sharedservices@sunrock-consulting.com"
     guardduty = "member"
-    iam-billing = "ALLOW"
+  },
+  src-prod1 = {
+    name      = "SunRock - PROD1"
+    email     = "karhea@gmail.com"
+    guardduty = "member"
+  },
+  src-otsr = {
+    name      = "OTSR - DEV1"
+    email     = "outtatowners.dev@gmail.com"
+    guardduty = "member"
   }
 }

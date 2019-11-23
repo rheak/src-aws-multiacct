@@ -91,65 +91,65 @@
       tags:
         - init
         - cleanup
-#
-#     - name: Master | Add Master Account Organization Terraform Config File to Working Directory
-#       copy:
-#         src: "{{item}}"
-#         dest: ../terraform/master/
-#       with_items:
-#         - ../terraform/master/templates/aws-org.tf
-#       tags:
-#         - init
-#
-# # Run Master Terraform to create organization and Enterprise Member Accounts
-#     - name: Master | Apply Terraform Configuration
-#       terraform:
-#         project_path: "../terraform/master/"
-#         state: present
-#         force_init: yes
-#       register: tf_result
-#       tags:
-#         - always
-#
-#     - name: Master | Print Terraform Results
-#       debug:
-#         msg: "{{ tf_result.stdout }}"
-#       when: tf_result
-#       tags:
-#         - always
-#
-#     - name: Master | Wait for AWS Organization to Create
-#       wait_for:
-#         timeout: 30
-#       tags:
-#         - init
-#
-#     - name: Master | Add Master Account Organization Members Terraform Config File to Working Directory
-#       copy:
-#         src: "{{item}}"
-#         dest: ../terraform/master/
-#       with_items:
-#         - ../terraform/master/templates/aws-member.tf
-#         - ../terraform/master/templates/outputs.tf
-#       tags:
-#         - init
-#
-#     - name: Master | Apply Terraform Configuration
-#       terraform:
-#         project_path: "../terraform/master/"
-#         state: present
-#         force_init: yes
-#       register: tf_result
-#       tags:
-#         - always
-#
-#     - name: Master | Print Terraform Results
-#       debug:
-#         msg: "{{ tf_result.stdout }}"
-#       when: tf_result
-#       tags:
-#         - always
-#
+
+    - name: Master | Add Master Account Organization Terraform Config File to Working Directory
+      copy:
+        src: "{{item}}"
+        dest: ../terraform/master/
+      with_items:
+        - ../terraform/master/templates/aws-org.tf
+      tags:
+        - init
+
+# Run Master Terraform to create organization and Enterprise Member Accounts
+    - name: Master | Apply Terraform Configuration
+      terraform:
+        project_path: "../terraform/master/"
+        state: present
+        force_init: yes
+      register: tf_result
+      tags:
+        - always
+
+    - name: Master | Print Terraform Results
+      debug:
+        msg: "{{ tf_result.stdout }}"
+      when: tf_result
+      tags:
+        - always
+
+    - name: Master | Wait for AWS Organization to Create
+      wait_for:
+        timeout: 30
+      tags:
+        - init
+
+    - name: Master | Add Master Account Organization Members Terraform Config File to Working Directory
+      copy:
+        src: "{{item}}"
+        dest: ../terraform/master/
+      with_items:
+        - ../terraform/master/templates/aws-member.tf
+        - ../terraform/master/templates/outputs.tf
+      tags:
+        - init
+
+    - name: Master | Apply Terraform Configuration
+      terraform:
+        project_path: "../terraform/master/"
+        state: present
+        force_init: yes
+      register: tf_result
+      tags:
+        - always
+
+    - name: Master | Print Terraform Results
+      debug:
+        msg: "{{ tf_result.stdout }}"
+      when: tf_result
+      tags:
+        - always
+
 # ########################## Initialize Logging Account#############################
 # ##################################################################################
 #     - name: Logging | Gather Log Account ID Output Variable
