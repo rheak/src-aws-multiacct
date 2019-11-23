@@ -3,8 +3,8 @@
   hosts: localhost
   vars:
     aws_plugin_version: 2.33.0
-    org_name: smap1
-    boto_profile: default
+    org_name: src
+    boto_profile: src-master
     main_region: us-east-1
 
   tasks:
