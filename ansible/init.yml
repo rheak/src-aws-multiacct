@@ -1,0 +1,674 @@
+---
+- name: Master | Intialize Master AWS Account Terraform Configuration
+  hosts: localhost
+  vars:
+    aws_plugin_version: 2.33.0
+    org_name: smap1
+    boto_profile: default
+    main_region: us-east-1
+
+  tasks:
+########################## Initialize Master Account #############################
+##################################################################################
+    - name: Master | Add Ansible Vars Master terraform.tfvars
+      blockinfile:
+        path: ../terraform/master/terraform.tfvars
+        insertbefore: BOF
+        marker: "# {mark} Ansible imported Variables Block"
+        block: |
+
+          aws_plugin_version = "{{aws_plugin_version}}"
+
+          org_name = "{{org_name}}"
+
+          profile = "{{boto_profile}}"
+
+          main_region = "{{main_region}}"
+
+      tags:
+        - init
+
+    - name: Master | Create Terraform Remote State Infrastructure
+      terraform:
+        project_path: "../terraform/master/"
+        state: present
+        force_init: yes
+      register: tf_result
+      tags:
+        - init
+
+    - name: Master | Print Terraform Results
+      debug:
+        msg: "{{ tf_result.stdout }}"
+      when: tf_result
+      tags:
+        - init
+
+    - name: Master | Add Remote Backend Config to main.tf
+      blockinfile:
+        marker:
+        path: ../terraform/master/main.tf
+        insertbefore: EOF
+        marker: "# {mark} Terraform Remote Backend Config Block"
+        block: |
+          terraform {
+            backend "s3" {
+              bucket         = "{{org_name}}-master-tf-state"
+              key            = "terraform.tfstate"
+              region         = "{{main_region}}"
+              encrypt        = true
+              dynamodb_table = "{{org_name}}-master-tf-state"
+              }
+          }
+      tags:
+        - init
+
+    - name: Master | Wait for State Lock to Clear
+      wait_for:
+        timeout: 30
+      tags:
+        - init
+
+    - name: Master | Migrate Terraform State to S3
+      shell: terraform init -force-copy
+      args:
+        chdir: ../terraform/master/
+      register: tf_result
+      tags:
+        - init
+
+    - name: Master | Print Terraform Results
+      debug:
+        msg: "{{ tf_result }}"
+      when: tf_result
+      tags:
+        - init
+
+    - name: Master | Remove Local State Files
+      file:
+        path: "{{item}}"
+        state: absent
+      with_items:
+        - ../terraform/master/terraform.tfstate
+        - ../terraform/master/terraform.tfstate.backup
+      tags:
+        - init
+        - cleanup
+
+    - name: Master | Add Master Account Organization Terraform Config File to Working Directory
+      copy:
+        src: "{{item}}"
+        dest: ../terraform/master/
+      with_items:
+        - ../terraform/master/templates/aws-org.tf
+      tags:
+        - init
+
+# Run Master Terraform to create organization and Enterprise Member Accounts
+    - name: Master | Apply Terraform Configuration
+      terraform:
+        project_path: "../terraform/master/"
+        state: present
+        force_init: yes
+      register: tf_result
+      tags:
+        - always
+
+    - name: Master | Print Terraform Results
+      debug:
+        msg: "{{ tf_result.stdout }}"
+      when: tf_result
+      tags:
+        - always
+
+    - name: Master | Wait for AWS Organization to Create
+      wait_for:
+        timeout: 30
+      tags:
+        - init
+
+    - name: Master | Add Master Account Organization Members Terraform Config File to Working Directory
+      copy:
+        src: "{{item}}"
+        dest: ../terraform/master/
+      with_items:
+        - ../terraform/master/templates/aws-member.tf
+        - ../terraform/master/templates/outputs.tf
+      tags:
+        - init
+
+    - name: Master | Apply Terraform Configuration
+      terraform:
+        project_path: "../terraform/master/"
+        state: present
+        force_init: yes
+      register: tf_result
+      tags:
+        - always
+
+    - name: Master | Print Terraform Results
+      debug:
+        msg: "{{ tf_result.stdout }}"
+      when: tf_result
+      tags:
+        - always
+
+########################## Initialize Logging Account#############################
+##################################################################################
+    - name: Logging | Gather Log Account ID Output Variable
+      shell: terraform output log_acct
+      args:
+        chdir: ../terraform/master/
+      register: log_acct
+      tags:
+        - init
+
+    - name: Logging | Add Ansible Vars to Logging terraform.tfvars
+      blockinfile:
+        path: ../terraform/log/terraform.tfvars
+        insertbefore: BOF
+        marker: "# {mark} Ansible imported Variables Block"
+        block: |
+
+          aws_plugin_version = "{{aws_plugin_version}}"
+
+          org_name = "{{org_name}}"
+
+          profile = "{{boto_profile}}"
+
+          main_region = "{{main_region}}"
+
+          log_acct_id = "{{log_acct.stdout}}"
+
+          ct_log_bucket_name = "{{org_name}}-logs-cloudtrail"
+
+          config_log_bucket_name = "{{org_name}}-logs-config"
+
+      tags:
+        - init
+
+    - name: Logging | Create Terraform Remote State Infrastructure
+      terraform:
+        project_path: "../terraform/log/"
+        state: present
+        force_init: yes
+      register: tf_result
+      tags:
+        - init
+
+    - name: Logging | Print Terraform Results
+      debug:
+        msg: "{{ tf_result.stdout }}"
+      when: tf_result
+      tags:
+        - init
+
+    - name: Logging | Add Remote Backend Config to main.tf
+      blockinfile:
+        path: ../terraform/log/main.tf
+        insertbefore: EOF
+        marker: "# {mark}  Terraform Remote Backend Config Block"
+        block: |
+          terraform {
+            backend "s3" {
+              bucket         = "{{org_name}}-log-tf-state"
+              key            = "terraform.tfstate"
+              region         = "{{main_region}}"
+              encrypt        = true
+              dynamodb_table = "{{org_name}}-log-tf-state"
+              profile        = "{{boto_profile}}"
+              role_arn       = "arn:aws:iam::{{log_acct.stdout}}:role/{{org_name}}-deploy-role"
+              }
+          }
+      tags:
+        - init
+
+    - name: Logging | Add Enterprise Accounts Remote State Data to main.tf
+      blockinfile:
+        path: ../terraform/log/main.tf
+        insertbefore: EOF
+        marker: "# {mark}  Terraform Enterprise Accounts Remote State Data Config Block"
+        block: |
+          data "terraform_remote_state" "master" {
+            backend = "s3"
+
+            config = {
+              bucket         = "{{org_name}}-master-tf-state"
+              key            = "terraform.tfstate"
+              region         = "{{main_region}}"
+              encrypt        = true
+              dynamodb_table = "{{org_name}}-master-tf-state"
+              profile        = "{{boto_profile}}"
+            }
+          }
+      tags:
+        - init
+
+    - name: Logging | Wait for State Lock to Clear
+      wait_for:
+        timeout: 30
+      tags:
+        - init
+
+    - name: Logging | Migrate Terraform State to S3
+      shell: terraform init -force-copy
+      args:
+        chdir: ../terraform/log/
+      register: tf_result
+      tags:
+        - init
+
+    - name: Logging | Print Terraform Results
+      debug:
+        msg: "{{ tf_result }}"
+      when: tf_result
+      tags:
+        - init
+
+    - name: Logging | Remove Local State Files
+      file:
+        path: "{{item}}"
+        state: absent
+      with_items:
+        - ../terraform/log/terraform.tfstate
+        - ../terraform/log/terraform.tfstate.backup
+      tags:
+        - init
+        - cleanup
+
+    - name: Logging | Add Logging Account Baseline Config Files to Working Directory
+      copy:
+        src: "{{item}}"
+        dest: ../terraform/log/
+      with_items:
+        - ../terraform/log/templates/kms-cloudtrail.tf
+        - ../terraform/log/templates/s3-cloudtrail.tf
+        - ../terraform/log/templates/iam.tf
+        - ../terraform/log/templates/flowlogs-cloudwatchlogs.tf
+        - ../terraform/log/templates/flowlogs-destination.tf
+        - ../terraform/log/templates/flowlogs-outputs.tf
+        - ../terraform/log/templates/config.tf
+        - ../terraform/log/templates/s3-config.tf
+        - ../terraform/log/templates/sns-config.tf
+        - ../terraform/log/templates/config-outputs.tf
+
+      tags:
+        - init
+
+    - name: Logging | Apply Terraform Configuration
+      terraform:
+        project_path: "../terraform/log/"
+        state: present
+        force_init: yes
+      register: tf_result
+      tags:
+        - init
+
+    - name: Logging | Print Terraform Results
+      debug:
+        msg: "{{ tf_result.stdout }}"
+      when: tf_result
+      tags:
+        - init
+
+######### Complete Master Account Initialization after Logging Acct Dependencies ##############
+###############################################################################################
+
+    - name: Master | Add Enterprise Accounts Remote State Data to main.tf
+      blockinfile:
+        path: ../terraform/master/main.tf
+        insertbefore: EOF
+        marker: "# {mark}  Terraform Enterprise Accounts Remote State Data Config Block"
+        block: |
+          data "terraform_remote_state" "log" {
+            backend = "s3"
+
+            config = {
+              bucket         = "{{org_name}}-log-tf-state"
+              key            = "terraform.tfstate"
+              region         = "{{main_region}}"
+              encrypt        = true
+              dynamodb_table = "{{org_name}}-log-tf-state"
+              profile        = "{{boto_profile}}"
+              role_arn       = "arn:aws:iam::{{log_acct.stdout}}:role/{{org_name}}-deploy-role"
+            }
+          }
+      tags:
+        - init
+
+    - name: Master | Add Master Account Cloudtrail Baseline Config Files to Working Directory
+      copy:
+        src: "{{item}}"
+        dest: ../terraform/master/
+      with_items:
+        - ../terraform/master/templates/cloudtrail.tf
+        - ../terraform/master/templates/flowlogs-cloudwatchlogs.tf
+        - ../terraform/master/templates/config.tf
+      tags:
+        - init
+
+    - name: Master | Apply Terraform Configuration
+      terraform:
+        project_path: "../terraform/master/"
+        state: present
+        force_init: yes
+      register: tf_result
+      tags:
+        - init
+
+    - name: Logging | Print Terraform Results
+      debug:
+        msg: "{{ tf_result.stdout }}"
+      when: tf_result
+      tags:
+        - init
+
+########################## Initialize Security Account#############################
+###################################################################################
+    - name: Security | Gather Security Account ID Output Variable
+      shell: terraform output security_acct
+      args:
+        chdir: ../terraform/master/
+      register: security_acct
+      tags:
+        - init
+
+    - name: Security | Add Ansible Vars to Security terraform.tfvars
+      blockinfile:
+        path: ../terraform/security/terraform.tfvars
+        insertbefore: BOF
+        marker: "# {mark} Ansible imported Variables Block"
+        block: |
+
+          aws_plugin_version = "{{aws_plugin_version}}"
+
+          org_name = "{{org_name}}"
+
+          profile = "{{boto_profile}}"
+
+          main_region = "{{main_region}}"
+
+          security_acct_id = "{{security_acct.stdout}}"
+
+      tags:
+        - init
+
+    - name: Security | Add Enterprise Account Remote State Data to main.tf
+      blockinfile:
+        path: ../terraform/security/main.tf
+        insertbefore: EOF
+        marker: "# {mark}  Terraform Enterprise Accounts Remote State Data Config Block"
+        block: |
+          data "terraform_remote_state" "master" {
+            backend = "s3"
+
+            config = {
+              bucket         = "{{org_name}}-master-tf-state"
+              key            = "terraform.tfstate"
+              region         = "{{main_region}}"
+              encrypt        = true
+              dynamodb_table = "{{org_name}}-master-tf-state"
+              profile        = "{{boto_profile}}"
+            }
+          }
+
+          data "terraform_remote_state" "log" {
+            backend = "s3"
+
+            config = {
+              bucket         = "{{org_name}}-log-tf-state"
+              key            = "terraform.tfstate"
+              region         = "{{main_region}}"
+              encrypt        = true
+              dynamodb_table = "{{org_name}}-log-tf-state"
+              profile        = "{{boto_profile}}"
+              role_arn       = "arn:aws:iam::{{log_acct.stdout}}:role/{{org_name}}-deploy-role"
+            }
+          }
+      tags:
+        - init
+
+    - name: Security | Create Baseline Infrastructure
+      terraform:
+        project_path: "../terraform/security/"
+        state: present
+        force_init: yes
+      register: tf_result
+      tags:
+        - init
+
+    - name: Security | Print Terraform Results
+      debug:
+        msg: "{{ tf_result.stdout }}"
+      when: tf_result
+      tags:
+        - init
+
+    - name: Security | Add Remote Backend Config to main.tf
+      blockinfile:
+        path: ../terraform/security/main.tf
+        insertbefore: EOF
+        marker: "# {mark}  Terraform Remote Backend Config Block"
+        block: |
+          terraform {
+            backend "s3" {
+              bucket         = "{{org_name}}-security-tf-state"
+              key            = "terraform.tfstate"
+              region         = "{{main_region}}"
+              encrypt        = true
+              dynamodb_table = "{{org_name}}-security-tf-state"
+              profile        = "{{boto_profile}}"
+              role_arn       = "arn:aws:iam::{{security_acct.stdout}}:role/{{org_name}}-deploy-role"
+              }
+          }
+      tags:
+        - init
+
+    - name: Security | Wait for State Lock to Clear
+      wait_for:
+        timeout: 30
+      tags:
+        - init
+
+    - name: Security | Migrate Terraform State to S3
+      shell: terraform init -force-copy
+      args:
+        chdir: ../terraform/security/
+      register: tf_result
+      tags:
+        - init
+
+    - name: Security | Print Terraform Results
+      debug:
+        msg: "{{ tf_result }}"
+      when: tf_result
+      tags:
+        - init
+
+    - name: Security | Remove Local State Files
+      file:
+        path: "{{item}}"
+        state: absent
+      with_items:
+        - ../terraform/security/terraform.tfstate
+        - ../terraform/security/terraform.tfstate.backup
+      tags:
+        - init
+        - cleanup
+
+############ Complete Master and Logging GuardDuty Initialization#########################
+##########################################################################################
+    - name: Master | Add Master Account GuardDuty Baseline Config Files to Working Directory
+      copy:
+        src: "{{item}}"
+        dest: ../terraform/master/
+      with_items:
+        - ../terraform/master/templates/guardduty-member.tf
+      tags:
+        - init
+
+    - name: Master | Apply Terraform Configuration
+      terraform:
+        project_path: "../terraform/master/"
+        state: present
+        force_init: yes
+      register: tf_result
+      tags:
+        - init
+
+    - name: Logging | Print Terraform Results
+      debug:
+        msg: "{{ tf_result.stdout }}"
+      when: tf_result
+      tags:
+        - init
+
+    - name: Logging | Add Logging Account GuardDuty Baseline Config Files to Working Directory
+      copy:
+        src: "{{item}}"
+        dest: ../terraform/log/
+      with_items:
+        - ../terraform/log/templates/guardduty-member.tf
+
+      tags:
+        - init
+
+    - name: Logging | Apply Terraform Configuration
+      terraform:
+        project_path: "../terraform/log/"
+        state: present
+        force_init: yes
+      register: tf_result
+      tags:
+        - init
+
+    - name: Logging | Print Terraform Results
+      debug:
+        msg: "{{ tf_result.stdout }}"
+      when: tf_result
+      tags:
+        - init
+
+########################## Initialize Shared Services Account#############################
+##########################################################################################
+    - name: Shared Services | Gather Shared Services Account ID Output Variable
+      shell: terraform output sharedservices_acct
+      args:
+        chdir: ../terraform/master/
+      register: sharedservices_acct
+      tags:
+        - init
+
+    - name: Shared Services  | Add Ansible Vars to Shared Services terraform.tfvars
+      blockinfile:
+        path: ../terraform/sharedservices/terraform.tfvars
+        insertbefore: BOF
+        marker: "# {mark} Ansible imported Variables Block"
+        block: |
+          aws_plugin_version = "{{aws_plugin_version}}"
+          org_name = "{{org_name}}"
+          profile = "{{boto_profile}}"
+          main_region = "{{main_region}}"
+          sharedservices_acct_id = "{{sharedservices_acct.stdout}}"
+      tags:
+        - init
+
+    - name: Shared Services  | Add Enterprise Account Remote State Data to main.tf
+      blockinfile:
+        path: ../terraform/sharedservices/main.tf
+        insertbefore: EOF
+        marker: "# {mark}  Terraform Enterprise Accounts Remote State Data Config Block"
+        block: |
+          data "terraform_remote_state" "master" {
+            backend = "s3"
+            config = {
+              bucket         = "{{org_name}}-master-tf-state"
+              key            = "terraform.tfstate"
+              region         = "{{main_region}}"
+              encrypt        = true
+              dynamodb_table = "{{org_name}}-master-tf-state"
+              profile        = "{{boto_profile}}"
+            }
+          }
+          data "terraform_remote_state" "log" {
+            backend = "s3"
+            config = {
+              bucket         = "{{org_name}}-log-tf-state"
+              key            = "terraform.tfstate"
+              region         = "{{main_region}}"
+              encrypt        = true
+              dynamodb_table = "{{org_name}}-log-tf-state"
+              profile        = "{{boto_profile}}"
+              role_arn       = "arn:aws:iam::{{log_acct.stdout}}:role/{{org_name}}-deploy-role"
+            }
+          }
+      tags:
+        - init
+
+    - name: Shared Services  | Create Baseline Infrastructure
+      terraform:
+        project_path: "../terraform/sharedservices/"
+        state: present
+        force_init: yes
+      register: tf_result
+      tags:
+        - init
+
+    - name: Shared Services  | Print Terraform Results
+      debug:
+        msg: "{{ tf_result.stdout }}"
+      when: tf_result
+      tags:
+        - init
+
+    - name: Shared Services  | Add Remote Backend Config to main.tf
+      blockinfile:
+        path: ../terraform/sharedservices/main.tf
+        insertbefore: EOF
+        marker: "# {mark}  Terraform Remote Backend Config Block"
+        block: |
+          terraform {
+            backend "s3" {
+              bucket         = "{{org_name}}-sharedservices-tf-state"
+              key            = "terraform.tfstate"
+              region         = "{{main_region}}"
+              encrypt        = true
+              dynamodb_table = "{{org_name}}-sharedservices-tf-state"
+              profile        = "{{boto_profile}}"
+              role_arn       = "arn:aws:iam::{{sharedservices_acct.stdout}}:role/{{org_name}}-deploy-role"
+              }
+          }
+      tags:
+        - init
+
+    - name: Shared Services  | Wait for State Lock to Clear
+      wait_for:
+        timeout: 30
+      tags:
+        - init
+
+    - name: Shared Services  | Migrate Terraform State to S3
+      shell: terraform init -force-copy
+      args:
+        chdir: ../terraform/sharedservices/
+      register: tf_result
+      tags:
+        - init
+
+    - name: Shared Services  | Print Terraform Results
+      debug:
+        msg: "{{ tf_result }}"
+      when: tf_result
+      tags:
+        - init
+
+    - name: Shared Services  | Remove Local State Files
+      file:
+        path: "{{item}}"
+        state: absent
+      with_items:
+        - ../terraform/sharedservices/terraform.tfstate
+        - ../terraform/sharedservices/terraform.tfstate.backup
+      tags:
+        - init
+        - cleanup

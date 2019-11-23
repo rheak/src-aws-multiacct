@@ -1,0 +1,7 @@
+---
+- name: Master | Intialize Master AWS Account Terraform Configuration
+  hosts: localhost
+  vars:
+    org_name: smap1
+    region: us-east-1
+  tasks:

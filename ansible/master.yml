@@ -1,0 +1,22 @@
+---
+- name: Master | Deploy Master AWS Account Terraform Configuration
+  hosts: localhost
+  vars:
+    org_name: smap1
+    region: us-east-1
+  tasks:
+    - name: Master | Apply Terraform Configuration
+      terraform:
+        project_path: "../terraform/master/"
+        state: present
+        force_init: yes
+      register: tf_result
+      tags:
+        - always
+
+    - name: Master | Print Terraform Results
+      debug:
+        msg: "{{ tf_result.stdout }}"
+      when: tf_result
+      tags:
+        - always
