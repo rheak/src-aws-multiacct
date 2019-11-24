@@ -6,8 +6,10 @@ profile = "default"
 
 main_region = "us-east-1"
 # END Ansible imported Variables Block
-#Provide the name of the account that will serve as the GuardDuty Master (Security Account is recommended)
+
+#Provide the name and email address of the account that will serve as the GuardDuty Master (Security Account is recommended)
 guardduty_master = "security"
+guardduty_master_email = "src-security@sunrock-consulting.com"
 
 master_acct = {
     name      = "src-master"

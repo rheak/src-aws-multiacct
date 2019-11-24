@@ -105,3 +105,18 @@ terraform {
     }
 }
 # END Terraform Remote Backend Config Block
+# BEGIN  Terraform Enterprise Accounts Remote State Data Config Block
+data "terraform_remote_state" "log" {
+  backend = "s3"
+
+  config = {
+    bucket         = "src-log-tf-state"
+    key            = "terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "src-log-tf-state"
+    profile        = "default"
+    role_arn       = "arn:aws:iam::051805593070:role/src-deploy-role"
+  }
+}
+# END  Terraform Enterprise Accounts Remote State Data Config Block

@@ -21,7 +21,11 @@ variable "provisioner_account_name" {
 }
 
 variable "guardduty_master" {
-  description = "Provide the name of the AWS Account that will serve as the GuardDuty Master (Security Account is recommended)"
+  description = "Provide the name attribute of the AWS Account that will serve as the GuardDuty Master (Security Account is recommended)"
+}
+
+variable "guardduty_master_email" {
+  description = "Provide the email address of the AWS Account that will serve as the GuardDuty Master (Security Account is recommended)"
 }
 
 # --------------------------------------------------------------------------------------------------
