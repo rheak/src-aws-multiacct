@@ -42,5 +42,10 @@ member_accts = {
     name      = "OTSR - DEV1"
     email     = "outtatowners.dev@gmail.com"
     guardduty = "member"
+  },
+  src-prod = {
+    name      = "src-prod"
+    email     = "src-prod@sunrock-consulting.com"
+    guardduty = "member"
   }
 }

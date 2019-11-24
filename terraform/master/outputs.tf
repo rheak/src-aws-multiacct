@@ -51,7 +51,7 @@ output "guardduty_master_acct_id" {
 
 output "guardduty_member_accts" {
   description = "(MAP) All GuardDuty Member Accounts"
-  value = {for x in aws_organizations_organization.org.accounts: x.email => x.id if x.name != "${var.guardduty_master_email}"}
+  value = {for x in aws_organizations_organization.org.accounts: x.email => x.id if x.email != "${var.guardduty_master_email}"}
 }
 
 output "log_acct" {
