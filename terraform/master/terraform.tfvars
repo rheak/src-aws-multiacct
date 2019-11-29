@@ -33,11 +33,6 @@ member_accts = {
     email     = "src-sharedservices@sunrock-consulting.com"
     guardduty = "member"
   },
-  src-prod1 = {
-    name      = "SunRock - PROD1"
-    email     = "karhea@gmail.com"
-    guardduty = "member"
-  },
   src-otsr = {
     name      = "OTSR - DEV1"
     email     = "outtatowners.dev@gmail.com"
